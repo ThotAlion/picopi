@@ -1,20 +1,26 @@
+// this header gets the functions for time measurements
 #include <chrono>
+// this header adds some common functions
 #include <functional>
+// this header deals with memory management
 #include <memory>
+// this header to work with strings
 #include <string>
+// this header to work with vectors
 #include <vector>
 // Linux headers
 #include <fcntl.h>   // Contains file controls like O_RDWR
 #include <errno.h>   // Error integer and strerror() function
 #include <termios.h> // Contains POSIX terminal control definitions
 #include <unistd.h>  // write(), read(), close()
-
+// the headers needed for ROS (and to add in CMAKELIST)
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
-
+// some precompiler constants
 #define DEG2RAD M_PI / 180.0
 #define DEFAULT_SERIALPORT "/dev/ttyACM0"
 
+//namespace for time units (line 110 we can use 10ms instead of std::chrono_literals::ms(10))
 using namespace std::chrono_literals;
 
 /* This example creates a subclass of Node and uses std::bind() to register a
@@ -23,14 +29,26 @@ using namespace std::chrono_literals;
 class PicoPublisher : public rclcpp::Node
 {
 public:
+    /**
+    constructor
+    */
     PicoPublisher() : Node("picopi")
     {
+        /////////////////////////////////////////////////////////////////////
+        // parameter management
+        /////////////////////////////////////////////////////////////////////
+        // this node has one param : the name of the serial port
+        // example of line
+        // ros2 run picopi publisher_picopi --ros-args -p port:=/dev/ttyACM0
+        // we first have to declare it for this node
         this->declare_parameter<std::string>("port", DEFAULT_SERIALPORT);
+        // get it to store it as a member of the class (see members of the class at the end)
         this->get_parameter("port", port_);
-        RCLCPP_INFO(this->get_logger(), "Hello %s", port_.c_str());
-        // manage the serial port
+        
+        /////////////////////////////////////////////////////////////////////
+        // serial port management
+        /////////////////////////////////////////////////////////////////////
         // see https://blog.mbedded.ninja/programming/operating-systems/linux/linux-serial-ports-using-c-cpp/
-
         // this instruction opens the serial port as a file
         // the O_RDWR (02) is a byte setting the flags at "Open for reading and writing". They are defined in fcntl.h
         serial_port_ = open(port_.c_str(), O_RDWR);
@@ -106,6 +124,9 @@ public:
             }
         }
     }
+    /**
+    destructor
+    */
     ~PicoPublisher()
     {
         close(serial_port_);
@@ -114,9 +135,11 @@ public:
 private:
     void timer_callback()
     {
-        // read the serial port
+        // read the serial port to feed a string
         char read_buf[1];
         std::string serialInput;
+
+        // the string is fed as long as there is no new line
         while (read_buf[0] != '\n')
         {
             int num_bytes = read(serial_port_, &read_buf, sizeof(read_buf));
@@ -129,7 +152,8 @@ private:
                 serialInput.push_back(read_buf[0]);
             }
         }
-        // RCLCPP_INFO(this->get_logger(), serialInput.c_str());
+
+        // convert the string in vector of int (16 ints)
         std::vector<int> res = split(serialInput, ',');
 
         // publish the laserscan
@@ -144,16 +168,19 @@ private:
         msg.range_min = 0.020f;                                    // minimum range value [m]
         msg.range_max = 4.0f;                                      // maximum range value [m]
 
+        // take the interesting rays
         msg.ranges[0] = res[3];
         msg.ranges[1] = res[7];
         msg.ranges[2] = res[11];
         msg.ranges[3] = res[15];
-
         msg.header.stamp = this->now();
 
         laserScanPublisher_->publish(msg);
     }
 
+    /**
+    this function converts a string delimited by commas into list of integers
+    */
     std::vector<int> split(const std::string &s, char delimiter)
     {
         std::vector<int> tokens;
