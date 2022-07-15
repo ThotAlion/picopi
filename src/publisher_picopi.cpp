@@ -25,7 +25,7 @@ class PicoPublisher : public rclcpp::Node
 public:
     PicoPublisher() : Node("picopi")
     {
-        this->declare_parameter<std::string>("port", "/dev/ttyACM0");
+        this->declare_parameter<std::string>("port", DEFAULT_SERIALPORT);
         this->get_parameter("port", port_);
         RCLCPP_INFO(this->get_logger(), "Hello %s", port_.c_str());
         // manage the serial port
@@ -33,7 +33,7 @@ public:
 
         // this instruction opens the serial port as a file
         // the O_RDWR (02) is a byte setting the flags at "Open for reading and writing". They are defined in fcntl.h
-        serial_port_ = open(DEFAULT_SERIALPORT, O_RDWR);
+        serial_port_ = open(port_.c_str(), O_RDWR);
 
         // Check for errors
         if (serial_port_ < 0)
@@ -42,7 +42,7 @@ public:
         }
         else
         {
-            RCLCPP_INFO(this->get_logger(), "Serial port %s successfully opened !", DEFAULT_SERIALPORT);
+            RCLCPP_INFO(this->get_logger(), "Serial port %s successfully opened !", port_.c_str());
 
             // configuration of the serial port console
             // Create new termios struct, we call it 'tty' for convention
@@ -97,7 +97,7 @@ public:
             }
             else
             {
-                RCLCPP_INFO(this->get_logger(), "Serial port %s successfully configured !", DEFAULT_SERIALPORT);
+                RCLCPP_INFO(this->get_logger(), "Serial port %s successfully configured !", port_.c_str());
                 // publisher for laserScan
                 laserScanPublisher_ = this->create_publisher<sensor_msgs::msg::LaserScan>("scan", 10);
                 // timer function
